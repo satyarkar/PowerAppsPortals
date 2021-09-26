@@ -1,0 +1,45 @@
+{% assign recordsPerPage = settings['EGrid/contact/recordsperpage'] %}
+{% fetchxml feed %}
+<fetch version="1.0" mapping="logical" {{ pagingCookie }} page="{{ request.params['page'] | default:1 }}" count="{{ recordsPerPage }}" returntotalrecordcount='true'>
+    <entity name="contact">
+        <attribute name="fullname"></attribute>
+        <attribute name="firstname"></attribute>
+        <attribute name="lastname"></attribute>
+        <attribute name="contactid"></attribute>
+        <attribute name="emailaddress1"></attribute>
+        <attribute name="telephone1"></attribute>
+        <attribute name="birthdate"></attribute>
+        <order attribute="contactid" descending="false"></order>
+        <filter type="and">
+            <condition attribute="firstname" operator="like" value="A%" />
+        </filter>
+    </entity>
+</fetch>
+{% endfetchxml %}
+
+<script>
+    //Add the entity data in json object
+    var entities =
+    {
+        totalcount: {{ feed.results.total_record_count }},
+        morerecords: {{ feed.results.more_records }},
+        pagingCookiee: "{{ feed.results.paging_cookie | escape | url_escape }}",
+        page: {{ request.params['page'] | default: 1 }},
+        recordsPerPage: {{ recordsPerPage }},
+        results: [
+        {% for item in feed.results.entities %}
+        {
+            id: "{{item.contactid}}",
+            fullname: "{{item.fullname}}",
+            firstname: "{{ item.firstname }}",
+            lastname: "{{ item.lastname }}",
+            emailaddress1: "{{ item.emailaddress1 }}",
+            telephone1: "{{ item.telephone1 }}",
+            birthdate: "{{ item.birthdate | date: 'dd-MM-yyyy' }}"
+    } {% unless forloop.last %}, {% endunless %}
+    {% endfor %}
+  ]
+};
+</script>
+
+{% include 'Editable Grid' gridSetting: 'EGrid/contact/gridconfig' %}

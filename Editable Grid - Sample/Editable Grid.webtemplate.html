@@ -1,0 +1,498 @@
+<div class="loader" style="background: url('~/loader.gif') no-repeat 50% 50% rgb(249, 249, 249); opacity: 0.7; left: 0px; top: 0px; width: 100%; height: 100%; position: fixed; z-index: 9999;">&nbsp;</div>
+<section class="page_section section-landing">
+  <div id="mainContent" class="container" role="main">
+    <div class="row ">
+      <div class="col-md-12">
+        <h1 class="section-landing-heading">{% editable snippets 'Home/Title' default: 'Contoso' %}</h1>
+        <h2 class="section-landing-sub-heading">{% editable snippets 'Home/Subtitle' default: 'Customer' %}</h2>
+      </div>
+    </div>
+  </div>
+  <div class="layer_down">&nbsp;</div>
+</section>
+<div class=container>
+    <div class=page-heading>
+        <ul class=breadcrumb>
+            {% for crumb in page.breadcrumbs -%}
+            <li>
+                <a href={{ crumb.url }}>{{ crumb.title }}</a>
+            </li>
+            {% endfor -%}
+            <li class=active>{{ page.title }}</li>
+        </ul>
+        <div class=page-header>
+            <h1>{{ page.title }}</h1>
+            <p>
+                This is a sample page. This page is configured to create, update, delete records in Dataverse using WEB API.
+            </p>
+        </div>
+    </div>
+
+    <h2 class="blue_border"></h2>
+    <div id="processingMsg" class="alert alert-warning" role="alert"></div>
+    <div id="dataTable"></div>
+    <ul id="pagination" class="pagination"></ul>
+</div>
+
+{% assign pagingCookie = entities.pagingCookiee %}
+{% if pagingCookie %}
+    {% assign pagingCookie = ' paging-cookie="{{ pagingCookie }}"' | liquid %}
+{% endif %}
+{% assign config = settings[gridSetting] %}
+{% assign gridSetting = gridSetting | default: 'Webapi/gridconfig' %}
+{% include 'WebAPIWrapper' %}
+
+<script>
+    $(window).load(function() {
+        $(".loader").fadeOut("slow");
+    })
+    var configString = JSON.stringify({{ config }});
+    var configObj = JSON.parse(configString);
+
+    $(function () {
+        // Notification component
+        var notificationMsg = (function () {
+            var $processingMsgEl = $('#processingMsg'),
+                _msg = 'Processing...',
+                _stack = 0,
+                _endTimeout;
+            return {
+                show: function (msg) {
+                    $processingMsgEl.text(msg || _msg);
+                    if (_stack === 0) {
+                        clearTimeout(_endTimeout);
+                        $processingMsgEl.show();
+                    }
+                    _stack++;
+                },
+                hide: function () {
+                    _stack--;
+                    if (_stack <= 0) {
+                        _stack = 0;
+                        clearTimeout(_endTimeout);
+                        _endTimeout = setTimeout(function () {
+                            $processingMsgEl.hide();
+                        }, 500);
+                    }
+                }
+            }
+        })();
+        // Inline editable table component
+        var tableGrid = (function () {
+            var trTpl = '<% _.forEach(data, function(data){ %>' +
+                '<tr data-id="<%=data.id%>">' +
+                '<% _.forEach(columns, function(col){ %>' +
+                '<td data-attribute="<%=col.name%>" data-label="<%=col.label%>" data-value="<%=data[col.name]%>">' +
+                '</td>' +
+                '<% }) %>' +
+                '<td>' +
+                '<button class="btn btn-default save" type="submit"><i class="glyphicon glyphicon-floppy-save" aria-hidden="true"></i></button>&nbsp;' +
+                '</td>' +
+                '<td>' +
+                '<button class="btn btn-default delete" type="submit"><i class="glyphicon glyphicon-trash" aria-hidden="true"></i></button>' +
+                '</td>' +
+                '</tr>' +
+                '<% }) %>';
+            var tableTpl = '<table class="table">' +
+                '<thead>' +
+                '<tr style="background-color:#85ace8;" id="trCreate">' +
+                '<div class="row">' +
+                '<% _.forEach(columns, function(col){ %>' +
+                '<th>' +
+                '<input type="text" class="form-control" id="txt<%=col.name%>" placeholder="Enter <%=col.label%>">' +
+                '</th >' +
+                '<% }) %>' +
+                '<th colspan="2">' +
+                '<button class="btn btn-default add btnCreate" type="submit"><i class="glyphicon glyphicon-plus" aria-hidden="true"></i>Create</button>' +
+                '</th>' +
+                '</div>' +
+                '</tr>' +
+                '<tr style="color:#003078;background-color:white;">' +
+                '<% _.forEach(columns, function(col){ %>' +
+                '<th style="text-align: center;"><%=col.label%></th>' +
+                '<% }) %>' +
+                '</tr>' +
+                '</thead>' +
+                '<tbody>' + trTpl + '</tbody>' +
+                '</table>';
+            function getDataObject(rowEl) {
+                var $rowEl = $(rowEl),
+                    attrObj = {
+                        id: $rowEl.attr('data-id'),
+                    };
+                $rowEl.find('td').each(function (i, el) {
+                    var $el = $(el),
+                        key = $el.attr('data-attribute');
+                    if (key) {
+                        attrObj[key] = $el.attr('data-value');
+                    }
+                })
+                return attrObj;
+            }
+            function bindRowEvents(tr, config) {
+                var $row = $(tr),
+                    $saveButton = $row.find('button.save'),
+                    $deleteButton = $row.find('button.delete'),
+                    dataObj = getDataObject($row);
+
+                $.each(config.columns, function (i, col) {
+                    var $el = $row.find('td[data-attribute="' + col.name + '"]');
+                    if (col.handler != null) {
+                        var $inputControl;
+                        switch (col.type) {
+                            case "text": {
+                                var input = $("<input type=\"text\" data-attribute=\"" + col.name + "\" value=\"" + dataObj[col.name] + "\"" + "\" style=\"border: 1.5px solid #0b0c0c;\" />");
+                                $inputControl = $(input);
+                                break;
+                            }
+                            case "date": {
+                                var input = $("<input type=\"text\" data-attribute=\"" + col.name + "\" value=\"" + dataObj[col.name] + "\"" + "\" style=\"border: 1.5px solid #0b0c0c;\" />");
+                                $inputControl = $(input);
+                                $inputControl.datepicker({
+                                    dateFormat: 'dd-mm-yy'
+                                });
+                                break;
+                            }
+                            default:
+                        }
+                        $inputControl.change($.proxy(col.handler, $inputControl, col, dataObj, config.inlineUpdate, $el));
+                        $el.html($inputControl);
+                    }
+                    else {
+                        $el.html(dataObj[col.name]);
+                    }
+                    if (col.isRequired) {
+                        $el.append("<span id=\"" + col.name + "\" style=\"color: red; font-weight: bold;\">*</span>");
+                    }
+                });
+
+                if (config.inlineUpdate === true) {
+                    $saveButton.attr("disabled", true);
+                }
+                else {
+                    //User can save record using this button
+                    $saveButton.on('click', $.proxy(config.updateHandler, $row, dataObj));
+                    $saveButton.removeAttr("disabled");
+                }
+
+                if (config.deleteHandler != null) {
+                    //User can delete record using this button
+                    $deleteButton.on('click', $.proxy(config.deleteHandler, $row, dataObj));
+                    $deleteButton.removeAttr("disabled");
+                }
+                else {
+                    $deleteButton.attr("disabled", true);
+                }
+            }
+            function bindTableEvents($table, config) {
+                $table.find('tbody tr').each(function (i, tr) {
+                    bindRowEvents(tr, config);
+                });
+                $createButton = $table.find('thead button.add');
+                if (config.addHandler != null) {
+                    $createButton.on('click', $.proxy(config.addHandler, $table));
+                    $createButton.removeAttr("disabled");
+                }
+                else {
+                    $createButton.attr("disabled", true);
+                }
+            }
+            return function (config) {
+                var me = this,
+                    columns = config.columns,
+                    data = config.data,
+                    addHandler = config.addHandler,
+                    updateHandler = config.updateHandler,
+                    deleteHandler = config.deleteHandler,
+                    inlineUpdate = config.inlineUpdate,
+                    $table;
+                me.render = function (el) {
+                    $table = $(el).html(_.template(tableTpl)({ columns: columns, data: data })).find('table');
+                    bindTableEvents($table, { columns: columns, addHandler: addHandler, updateHandler: updateHandler, deleteHandler: deleteHandler, inlineUpdate: inlineUpdate });
+                }
+                me.addRecord = function (record) {
+                    $table.find('tbody tr:first').before(_.template(trTpl)({ columns: columns, data: [record] }));
+                    bindRowEvents($table.find('tbody tr:first'), config);
+                }
+                me.updateRecord = function (row, record) {
+                    for (key in record) {
+                        var col = columns.find(item => item.name == key);
+                        var $el = row.find('td[data-attribute="' + key + '"]');
+                        me.setAttribute(col, $el, record[key]);
+                        var $div = $el.find('div[id="' + key + '"]');
+                        if ($div != null && $div.length != 0) {
+                            $div.hide();
+                        }
+                    }
+                }
+                me.updateColumn = function (attributeName, record, col) {
+                    var $el = $table.find('tr[data-id="' + record.id + '"] td[data-attribute="' + attributeName + '"]');
+                    me.setAttribute(col, $el, record[col.name]);
+                }
+                me.removeRecord = function (record) {
+                    $table.find('tr[data-id="' + record.id + '"]').fadeTo("slow", 0.7, function () {
+                        $(this).remove();
+                    });
+                }
+                me.setAttribute = function (col, $el, value) {
+                    var $input = $el.find('input[data-attribute="' + col.name + '"]');
+                    switch (col.type) {
+                        case "text": {
+                            $el.attr('data-value', value);
+                            $input.attr('value', value);
+                            break;
+                        }
+                        case "date": {
+                            if ($input.val() != "") {
+                                var date = new Date(value.replace(/(\d{2})-(\d{2})-(\d{4})/, "$3/$2/$1"));
+                                date = ((date.getDate() > 9) ? date.getDate() : ('0' + date.getDate())) + '-' + ((date.getMonth() > 8) ? (date.getMonth() + 1) : ('0' + (date.getMonth() + 1))) + '-' + date.getFullYear();
+                                $el.attr('data-value', date);
+                                $input.attr('value', date);
+                            }
+                            else {
+                                $el.attr('data-value', "");
+                                $input.attr('value', "");
+                            }
+                            break;
+                        }
+                        default: {
+                            break;
+                        }
+                    }
+                }
+            };
+        })();
+
+        //Applicaton ajax wrapper
+        function appAjax(processingMsg, ajaxOptions) {
+            notificationMsg.show(processingMsg);
+            return webapi.safeAjax(ajaxOptions)
+                .fail(function (response) {
+                    if (response.responseJSON) {
+                        alert("Error: " + response.responseJSON.error.message)
+                    } else {
+                        alert("Error: Web API is not available... ")
+                    }
+                }).always(notificationMsg.hide);
+        }
+        function clearColumns() {
+            configObj.gridColumns.forEach(function (gridColumn, index) {
+                $("#txt" + gridColumn.name).val('');
+            });
+        }
+        function getColumnValue(col, value) {
+            switch (col.type) {
+                case "text": {
+                    return value;
+                    break;
+                }
+                case "date": {
+                    if (value != "") {
+                        var date = new Date(value.replace(/(\d{2})-(\d{2})-(\d{4})/, "$3/$2/$1"));
+                        date = ((date.getDate() > 9) ? date.getDate() : ('0' + date.getDate())) + '-' + ((date.getMonth() > 8) ? (date.getMonth() + 1) : ('0' + (date.getMonth() + 1))) + '-' + date.getFullYear();
+                        return date;
+                    }
+                    else {
+                        return null;
+                    }
+                    break;
+                }
+                default: {
+                    return value;
+                    break;
+                }
+            }
+        }
+        function getColumnValueForUpdate(col, value) {
+            switch (col.type) {
+                case "text": {
+                    return value;
+                    break;
+                }
+                case "date": {
+                    if (value != "") {
+                        var date = new Date(value.replace(/(\d{2})-(\d{2})-(\d{4})/, "$3/$2/$1"));
+                        date = date.getFullYear() + '-' + ((date.getMonth() > 8) ? (date.getMonth() + 1) : ('0' + (date.getMonth() + 1))) + '-' + ((date.getDate() > 9) ? date.getDate() : ('0' + date.getDate()));
+                        return date;
+                    }
+                    else {
+                        return null;
+                    }
+                    break;
+                }
+                default: {
+                    return value;
+                    break;
+                }
+            }
+        }
+        function addRecord() {
+
+            var recordObj = {
+            };
+            var refreshRecordObj = {
+            };
+            configObj.gridColumns.forEach(function (gridColumn, index) {
+                var colValue = getColumnValueForUpdate(gridColumn, $("#txt" + gridColumn.name).val());
+                var refreshColValue = getColumnValue(gridColumn, $("#txt" + gridColumn.name).val());
+                if (colValue != "") {
+                    recordObj[gridColumn.name] = colValue;
+                    refreshRecordObj[gridColumn.name] = refreshColValue;
+                }
+            });
+            appAjax('Adding...', {
+                type: "POST",
+                url: "/_api/" + configObj.entitySchemaName,
+                contentType: "application/json",
+                data: JSON.stringify(recordObj),
+                success: function (res, status, xhr) {
+                    refreshRecordObj.id = xhr.getResponseHeader("entityid");
+                    table.addRecord(refreshRecordObj);
+                    clearColumns();
+                }
+            });
+            return false;
+        }
+        function deleteRecord(recordObj) {
+            var response = confirm("Are you sure, you want to delete?");
+            if (response == true) {
+                appAjax('Deleting...', {
+                    type: "DELETE",
+                    url: "/_api/" + configObj.entitySchemaName + "(" + recordObj.id + ")",
+                    contentType: "application/json",
+                    success: function (res) {
+                        table.removeRecord(recordObj);
+                    }
+                });
+            }
+            return false;
+        }
+        function updateRecord(recordObj) {
+            var $row = this;
+            var canUpdate = true;
+            var updateRecordObj = {};
+            if (configObj.gridColumns != null) {
+                configObj.gridColumns.forEach(function (gridColumn, index) {
+                    if (gridColumn.update === true) {
+                        var $td = $row.find('td[data-attribute="' + gridColumn.name + '"]');
+                        var $input = $td.find('input[data-attribute="' + gridColumn.name + '"]');
+                        if (gridColumn.isRequired && $input.val() == "") {
+                            var $div = $td.find('div[id="' + gridColumn.name + '"]');
+                            if ($div != null && $div.length == 0) {
+                                $td.append("<div id=\"" + attributeName + "\" style=\"color: red;font-family: SegoeUI-Semibold,Segoe UI Semibold,Segoe UI Regular,Segoe UI\">" + col.label + ": Required fields must be filled in." + "</div>");
+                            }
+                            canUpdate = false;
+                        }
+                        if ($td.attr('data-value') != $input.val()) {
+                            updateRecordObj[gridColumn.name] = getColumnValueForUpdate(gridColumn, $input.val());
+                        }
+                    }
+                });
+            }
+            if (!$.isEmptyObject(updateRecordObj) && canUpdate) {
+                appAjax('Updating record', {
+                    type: "PATCH",
+                    url: "/_api/" + configObj.entitySchemaName + "(" + recordObj.id + ")",
+                    contentType: "application/json",
+                    data: JSON.stringify(updateRecordObj),
+                    success: function (res) {
+                        table.updateRecord($row, updateRecordObj);
+                    }
+                });
+            }
+        }
+        function updateRecordColumn(col, recordObj, inlineUpdate, $td) {
+            var attributeName = col.name,
+            value = recordObj[attributeName],
+            newValue = this.val();
+            newValue = getColumnValueForUpdate(col, newValue);
+            if (col.isRequired && newValue == "") {
+                var $div = $td.find('div[id="' + attributeName + '"]');
+                if ($div != null && $div.length == 0) {
+                    $td.append("<div id=\"" + attributeName + "\" style=\"color: red;font-family: SegoeUI-Semibold,Segoe UI Semibold,Segoe UI Regular,Segoe UI\">" + col.label + ": Required fields must be filled in." + "</div>");
+                }
+                else {
+                    $div.show();
+                }
+                return;
+            }
+            else {
+                var $div = $td.find('div[id="' + attributeName + '"]');
+                if ($div != null) {
+                    $div.hide();
+                }
+            }
+
+            if (inlineUpdate === true) {
+                recordObj[attributeName] = newValue;
+                if (newValue !== value) {
+                    appAjax('Updating...', {
+                        type: "PUT",
+                        url: "/_api/" + configObj.entitySchemaName + "(" + recordObj.id + ")/" + attributeName,
+                        contentType: "application/json",
+                        data: JSON.stringify({
+                            "value": newValue
+                        }),
+                        success: function (res) {
+                            table.updateColumn(attributeName, recordObj, col);
+                        }
+                    });
+                }
+            }
+            return false;
+        }
+        function addPagination() {
+            var currentPage = entities.page;
+            var previousPage;
+            var nextPage;
+            /*if(queryString["page"]){
+                currentPage = queryString["page"];
+            }*/
+            var totalPage = Math.ceil(entities.totalcount / entities.recordsPerPage);
+            if (totalPage > 1) {
+                if(currentPage == 1){
+                    $("#pagination").append("<li class=\"disabled\"><a><</a></li>");
+                }
+                else{
+                    previousPage = currentPage - 1;
+                    $("#pagination").append("<li><a href=\"?page=" + previousPage + "\"><</a></li>");
+                }
+
+                for (var i = 1; i <= totalPage; i++) {
+                    if(i == currentPage){
+                        $("#pagination").append("<li class=\"active\"><a href=\"?page=" + i + "\">" + i + "</a></li>");
+                    }
+                    else{
+                        $("#pagination").append("<li><a href=\"?page=" + i + "\">" + i + "</a></li>");
+                    }
+                }
+                if(currentPage == totalPage){
+                    $("#pagination").append("<li class=\"disabled\"><a>></a></li>");
+                }
+                else {
+                    nextPage = parseInt(currentPage) + 1;
+                    $("#pagination").append("<li><a href=\"?page=" + nextPage + "\">></a></li>");
+                }
+            }
+        }
+
+        var columns = [];
+        if (configObj.gridColumns != null) {
+            configObj.gridColumns.forEach(function (gridColumn, index) {
+                columns.push({ name: gridColumn.name, label: gridColumn.label, type: gridColumn.type, handler: gridColumn.update === true ? updateRecordColumn : null, isRequired: gridColumn.isRequired });
+            });
+        }
+        var table = new tableGrid({
+            columns: columns,
+            data: entities.results,
+            addHandler: configObj.create === true ? addRecord : null,
+            updateHandler: updateRecord,
+            deleteHandler: configObj.delete === true ? deleteRecord : null,
+            inlineUpdate: configObj.inlineUpdate
+        });
+        if (entities.results.length > 0) {
+            table.render($('#dataTable'));
+            addPagination();
+        }
+    });
+</script>

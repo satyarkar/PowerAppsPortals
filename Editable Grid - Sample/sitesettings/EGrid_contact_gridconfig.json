@@ -1,0 +1,43 @@
+{
+  "entitySchemaName": "contacts",
+  "create": true,
+  "delete": true,
+  "inlineUpdate": true,
+  "gridColumns": [
+    {
+      "name": "firstname",
+      "label": "First Name",
+      "type": "text",
+      "update": true,
+      "isRequired": false
+    },
+    {
+      "name": "lastname",
+      "label": "Last Name",
+      "type": "text",
+      "update": false,
+      "isRequired": true
+    },
+    {
+      "name": "emailaddress1",
+      "label": "Email",
+      "type": "text",
+      "update": false,
+      "isRequired": false
+    },
+    {
+      "name": "telephone1",
+      "label": "Telephone",
+      "type": "text",
+      "update": true,
+      "isRequired": true
+    },
+    {
+      "name": "birthdate",
+      "label": "Birthday",
+      "type": "date",
+      "update": true,
+      "isRequired": false
+    }
+  ]
+}

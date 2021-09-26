@@ -1,0 +1,43 @@
+{% assign recordsPerPage = settings['EGrid/account/recordsperpage'] %}
+{% fetchxml feed %}
+<fetch version="1.0" mapping="logical" {{ pagingCookie }} page="{{ request.params['page'] | default:1 }}" count="{{ recordsPerPage }}" returntotalrecordcount='true'>
+    <entity name="account">
+        <attribute name="name" />
+        <attribute name="telephone1" />
+        <attribute name="accountid" />
+        <attribute name="address1_postalcode" />
+        <attribute name="address1_line1" />
+        <attribute name="address1_city" />
+        <attribute name="accountnumber" />
+        <attribute name="createdon" />
+        <order attribute="createdon" descending="true" />
+    </entity>
+</fetch>
+{% endfetchxml %}
+
+<script>
+    //Add the entity data in json object
+    var entities =
+    {
+        totalcount: {{ feed.results.total_record_count }},
+        morerecords: {{ feed.results.more_records }},
+        pagingCookiee: "{{ feed.results.paging_cookie | escape | url_escape }}",
+        page: {{ request.params['page'] | default: 1 }},
+        recordsPerPage: {{ recordsPerPage }},
+        results: [
+        {% for item in feed.results.entities %}
+        {
+            id: "{{item.accountid}}",
+            name: "{{item.name}}",
+            telephone1: "{{ item.telephone1 }}",
+            address1_postalcode: "{{ item.address1_postalcode }}",
+            address1_line1: "{{ item.address1_line1 }}",
+            address1_city: "{{ item.address1_city }}",
+            accountnumber: "{{ item.accountnumber }}"
+    } {% unless forloop.last %}, {% endunless %}
+    {% endfor %}
+  ]
+};
+</script>
+
+{% include 'Editable Grid' gridSetting: 'EGrid/account/gridconfig' %}

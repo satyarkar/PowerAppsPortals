@@ -1,0 +1,43 @@
+{
+	"entitySchemaName": "accounts",
+	"create": true,
+	"delete": true,
+	"inlineUpdate": false,
+	"gridColumns": [
+	{
+		"name": "name",
+		"label": "Account Name",
+		"type": "text",
+		"update": false,
+		"isRequired": 0
+	},
+	{
+		"name": "telephone1",
+		"label": "Main Phone",
+		"type": "text",
+		"update": true,
+		"isRequired": true
+	},
+	{
+		"name": "address1_line1",
+		"label": "Street 1",
+		"type": "text",
+		"update": true,
+		"isRequired": false
+	},
+	{
+		"name": "address1_city",
+		"label": "City",
+		"type": "text",
+		"update": true,
+		"isRequired": true
+	},
+	{
+		"name": "address1_postalcode",
+		"label": "Post Code",
+		"type": "text",
+		"update": false,
+		"isRequired": false
+	}
+	]
+}
